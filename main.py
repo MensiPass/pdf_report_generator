@@ -1,17 +1,20 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import FileResponse
-
 from report import generate_pdf
+
+
 
 app = FastAPI()
 
 DB_PATH = "report.db"
 REPORTS_DIR = Path("reports")
 
+class ReportRequest(BaseModel):
+    force: bool = False
 
 def init_reports_table():
     conn = sqlite3.connect(DB_PATH)
@@ -38,8 +41,37 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/reports", status_code=201)
-def create_report():
+
+
+@app.post("/reports")
+def create_report(request: ReportRequest | None = None):
+    if request is None:
+        request = ReportRequest()
+    if not request.force:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+
+        existing_report = conn.execute(
+            """
+            SELECT id, path
+            FROM reports
+            WHERE date(created_at) = date('now')
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+        conn.close()
+
+        if existing_report:
+            return {
+                "id": existing_report["id"],
+                "file": f"/reports/{existing_report['id']}/file",
+            }
+
+    conn = sqlite3.connect(DB_PATH)
+
+    created_at = datetime.now().isoformat()
     conn = sqlite3.connect(DB_PATH)
 
     created_at = datetime.now().isoformat()
@@ -51,7 +83,7 @@ def create_report():
         """,
         ("", created_at),
     )
-
+    
     report_id = cursor.lastrowid
     conn.commit()
     conn.close()
