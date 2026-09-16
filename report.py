@@ -237,14 +237,17 @@ def build_html(data):
     """
 
 
-def generate_pdf():
+def generate_pdf(output_path=None):
     data = getReportData()
     html = build_html(data)
 
-    reports_dir = Path("reports")
-    reports_dir.mkdir(exist_ok=True)
-
-    pdf_path = reports_dir / "test.pdf"
+    if output_path is None:
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+        pdf_path = reports_dir / "test.pdf"
+    else:
+        pdf_path = Path(output_path)
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
